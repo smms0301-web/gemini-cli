@@ -15,10 +15,21 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
+import { ToolConfirmationQueue } from '../components/ToolConfirmationQueue.js';
+import { useConfirmingTool } from '../hooks/useConfirmingTool.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
+  const config = useConfig();
   const isAlternateBuffer = useAlternateBuffer();
+
+  // Phase 4: Global Queue Logic
+  // If the event-driven scheduler is enabled AND we have a tool waiting,
+  // we switch the footer mode to "Queue".
+  const confirmingTool = useConfirmingTool();
+  const showConfirmationQueue =
+    config.isEventDrivenSchedulerEnabled() && confirmingTool !== null;
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
@@ -55,6 +66,8 @@ export const DefaultAppLayout: React.FC = () => {
             terminalWidth={uiState.mainAreaWidth}
             addItem={uiState.historyManager.addItem}
           />
+        ) : showConfirmationQueue ? (
+          <ToolConfirmationQueue confirmingTool={confirmingTool} />
         ) : (
           <Composer />
         )}

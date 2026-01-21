@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -58,14 +58,17 @@ export const ToolConfirmationMessage: React.FC<
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval;
 
-  const handleConfirm = (outcome: ToolConfirmationOutcome) => {
-    void confirm(callId, outcome).catch((error) => {
-      debugLogger.error(
-        `Failed to handle tool confirmation for ${callId}:`,
-        error,
-      );
-    });
-  };
+  const handleConfirm = useCallback(
+    (outcome: ToolConfirmationOutcome) => {
+      void confirm(callId, outcome).catch((error) => {
+        debugLogger.error(
+          `Failed to handle tool confirmation for ${callId}:`,
+          error,
+        );
+      });
+    },
+    [confirm, callId],
+  );
 
   const isTrustedFolder = config.isTrustedFolder();
 
@@ -79,7 +82,10 @@ export const ToolConfirmationMessage: React.FC<
     { isActive: isFocused },
   );
 
-  const handleSelect = (item: ToolConfirmationOutcome) => handleConfirm(item);
+  const handleSelect = useCallback(
+    (item: ToolConfirmationOutcome) => handleConfirm(item),
+    [handleConfirm],
+  );
 
   const { question, bodyContent, options } = useMemo(() => {
     let bodyContent: React.ReactNode | null = null;
