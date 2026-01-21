@@ -466,6 +466,20 @@ Would you like to attempt to install via "git clone" instead?`,
     );
   }
 
+  protected override async startExtension(extension: GeminiCLIExtension) {
+    await super.startExtension(extension);
+    if (extension.themes) {
+      themeManager.registerExtensionThemes(extension.name, extension.themes);
+    }
+  }
+
+  protected override async stopExtension(extension: GeminiCLIExtension) {
+    await super.stopExtension(extension);
+    if (extension.themes) {
+      themeManager.unregisterExtensionThemes(extension.name, extension.themes);
+    }
+  }
+
   /**
    * Loads all installed extensions, should only be called once.
    */
@@ -622,10 +636,6 @@ Would you like to attempt to install via "git clone" instead?`,
       const skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
       );
-
-      if (config.themes) {
-        themeManager.registerExtensionThemes(config.themes);
-      }
 
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),

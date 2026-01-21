@@ -49,7 +49,7 @@ describe('ExtensionManager theme loading', () => {
     vi.clearAllMocks();
   });
 
-  it('should register themes from an extension', async () => {
+  it('should register themes from an extension when started', async () => {
     createExtension({
       extensionsDir: userExtensionsDir,
       name: 'my-theme-extension',
@@ -66,14 +66,30 @@ describe('ExtensionManager theme loading', () => {
 
     await extensionManager.loadExtensions();
 
-    expect(themeManager.registerExtensionThemes).toHaveBeenCalledWith([
-      {
-        name: 'My-Awesome-Theme',
-        type: 'custom',
-        text: {
-          primary: '#FF00FF',
+    const mockConfig = {
+      getEnableExtensionReloading: () => false,
+      getMcpClientManager: () => ({
+        startExtension: vi.fn().mockResolvedValue(undefined),
+      }),
+      getGeminiClient: () => ({
+        isInitialized: () => false,
+      }),
+      getHookSystem: () => undefined,
+    } as unknown as Config;
+
+    await extensionManager.start(mockConfig);
+
+    expect(themeManager.registerExtensionThemes).toHaveBeenCalledWith(
+      'my-theme-extension',
+      [
+        {
+          name: 'My-Awesome-Theme',
+          type: 'custom',
+          text: {
+            primary: '#FF00FF',
+          },
         },
-      },
-    ] as CustomTheme[]);
+      ] as CustomTheme[],
+    );
   });
 });
