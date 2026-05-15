@@ -1,0 +1,2 @@
+-keep class com.mobiapp.data.** { *; }
+-keep class com.mobiapp.service.** { *; }
