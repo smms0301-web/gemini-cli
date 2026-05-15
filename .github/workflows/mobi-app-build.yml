@@ -23,28 +23,22 @@ jobs:
           java-version: "17"
           distribution: "temurin"
 
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
+      - name: Install Gradle 8.9
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip -O /tmp/gradle.zip
+          unzip -q /tmp/gradle.zip -d /opt/gradle
+          echo "/opt/gradle/gradle-8.9/bin" >> $GITHUB_PATH
 
-      - name: Cache Gradle packages
+      - name: Cache Gradle caches
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('mobi-app/**/*.gradle.kts', 'mobi-app/gradle/libs.versions.toml', 'mobi-app/gradle/wrapper/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Generate Gradle wrapper at 8.9
-        working-directory: mobi-app
-        run: gradle wrapper --gradle-version=8.9 --distribution-type=bin
+          path: ~/.gradle/caches
+          key: gradle-${{ runner.os }}-8.9-${{ hashFiles('mobi-app/**/*.gradle.kts', 'mobi-app/gradle/libs.versions.toml') }}
+          restore-keys: gradle-${{ runner.os }}-8.9-
 
       - name: Build debug APK
         working-directory: mobi-app
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
