@@ -38,8 +38,9 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Grant execute permission to gradlew
-        run: chmod +x mobi-app/gradlew
+      - name: Generate Gradle wrapper at 8.9
+        working-directory: mobi-app
+        run: gradle wrapper --gradle-version=8.9 --distribution-type=bin
 
       - name: Build debug APK
         working-directory: mobi-app
