@@ -1,0 +1,49 @@
+name: Build Mobi App Debug APK
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "mobi-app/**"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobi-app/**/*.gradle.kts', 'mobi-app/gradle/libs.versions.toml', 'mobi-app/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Grant execute permission to gradlew
+        run: chmod +x mobi-app/gradlew
+
+      - name: Build debug APK
+        working-directory: mobi-app
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobi-app-debug-${{ github.sha }}
+          path: mobi-app/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+          if-no-files-found: error
