@@ -36,7 +36,7 @@ fun AddEditNoteScreen(
         if (!initialized && noteId != null && existing != null) {
             title = existing!!.title
             content = existing!!.content
-            try { selectedColor = Color(android.graphics.Color.parseColor(existing!!.colorHex)) } catch (_: Exception) {}
+            try { selectedColor = Color(android.graphics.Color.parseColor(existing!!.colorHex)) } catch (e: Exception) { /* invalid color hex, keep default */ }
             initialized = true
         }
     }
