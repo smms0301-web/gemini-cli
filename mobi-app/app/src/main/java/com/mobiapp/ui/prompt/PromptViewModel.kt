@@ -11,27 +11,31 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class PromptViewModel @Inject constructor(private val repo: PromptRepository) : ViewModel() {
+class PromptViewModel @Inject constructor(
+    private val repo: PromptRepository
+) : ViewModel() {
 
-    val prompts: StateFlow<List<PromptEntity>> = repo.getAll()
+    val query = MutableStateFlow("")
+
+    private val allPrompts = repo.getAllPrompts()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
-
-    val filtered: StateFlow<List<PromptEntity>> = combine(prompts, _query) { list, q ->
+    val prompts: StateFlow<List<PromptEntity>> = query.combine(allPrompts) { q, list ->
         if (q.isBlank()) list
-        else list.filter { p -> FuzzySearch.matches(q, p.title) || FuzzySearch.matches(q, p.category) || q.lowercase() in p.promptText.lowercase() }
+        else list.filter { FuzzySearch.matches(q, "${it.title} ${it.content} ${it.tags} ${it.category}") }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setQuery(q: String) { _query.value = q }
+    fun getPrompt(id: Long) = repo.getPromptById(id)
 
-    suspend fun getById(id: Long) = repo.getById(id)
-
-    fun save(prompt: PromptEntity, onDone: () -> Unit) = viewModelScope.launch {
-        if (prompt.id == 0L) repo.insert(prompt) else repo.update(prompt.copy(updatedAt = System.currentTimeMillis()))
+    fun savePrompt(prompt: PromptEntity, onDone: () -> Unit) = viewModelScope.launch {
+        if (prompt.id == 0L) repo.insertPrompt(prompt)
+        else repo.updatePrompt(prompt.copy(updatedAt = System.currentTimeMillis()))
         onDone()
     }
 
-    fun delete(prompt: PromptEntity) = viewModelScope.launch { repo.delete(prompt) }
+    fun toggleFavorite(prompt: PromptEntity) = viewModelScope.launch {
+        repo.updatePrompt(prompt.copy(isFavorite = !prompt.isFavorite))
+    }
+
+    fun deletePrompt(prompt: PromptEntity) = viewModelScope.launch { repo.deletePrompt(prompt) }
 }

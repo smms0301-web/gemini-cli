@@ -4,60 +4,57 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.mobiapp.data.entity.ToolEntity
-import com.mobiapp.navigation.Screen
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.theme.*
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.components.TagChip
+import com.mobiapp.ui.theme.Amber
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ToolDetailScreen(
     toolId: Long,
-    onNavigate: (String) -> Unit,
     onBack: () -> Unit,
+    onEdit: (Long) -> Unit,
     viewModel: ToolViewModel = hiltViewModel()
 ) {
-    var tool by remember { mutableStateOf<ToolEntity?>(null) }
-    LaunchedEffect(toolId) { tool = viewModel.getById(toolId) }
+    val tool by viewModel.getTool(toolId).collectAsState(initial = null)
 
     Scaffold(
-        containerColor = Background,
         topBar = {
-            MobiTopBar(tool?.name ?: "Tool", onBack = onBack, actions = {
-                tool?.let {
-                    IconButton(onClick = { onNavigate(Screen.AddEditTool.createRoute(toolId)) }) {
-                        Icon(Icons.Default.Edit, "Edit", tint = Amber)
+            MobiTopBar(
+                title = tool?.name ?: "Tool",
+                onBack = onBack,
+                actions = {
+                    IconButton(onClick = { onEdit(toolId) }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Amber)
                     }
                 }
-            })
+            )
         }
     ) { padding ->
         tool?.let { t ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding)
-                    .verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                MobiCard {
-                    Text("Description", color = Amber, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Text(t.description, color = OnBackground, style = MaterialTheme.typography.bodyMedium)
+                if (t.category.isNotBlank()) TagChip(t.category)
+                if (t.tags.isNotBlank()) {
+                    Row { t.tags.split(",").forEach { TagChip(it.trim()) } }
                 }
-                MobiCard {
-                    Text("Tags", color = Amber, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        t.tags.split(",").filter { it.isNotBlank() }.forEach { tag ->
-                            TagChip(tag.trim())
-                        }
-                    }
+                if (t.description.isNotBlank()) {
+                    Text(t.description, style = MaterialTheme.typography.bodyLarge)
+                }
+                if (t.url.isNotBlank()) {
+                    Divider()
+                    Text("URL", style = MaterialTheme.typography.labelMedium, color = Amber)
+                    Text(t.url, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }

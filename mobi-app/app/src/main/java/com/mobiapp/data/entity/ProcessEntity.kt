@@ -7,9 +7,8 @@ import androidx.room.PrimaryKey
 data class ProcessEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
-    val category: String,
-    val siteTag: String,
     val description: String = "",
+    val category: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

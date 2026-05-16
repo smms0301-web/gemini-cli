@@ -19,13 +19,8 @@ import com.mobiapp.data.entity.*
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun processDao(): ProcessDao
-    abstract fun processStepDao(): ProcessStepDao
     abstract fun reminderDao(): ReminderDao
     abstract fun promptDao(): PromptDao
     abstract fun toolDao(): ToolDao
     abstract fun noteDao(): NoteDao
-
-    companion object {
-        const val DATABASE_NAME = "mobiapp_db"
-    }
 }

@@ -1,116 +1,81 @@
 package com.mobiapp.ui.reminder
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobiapp.data.entity.ReminderEntity
-import com.mobiapp.navigation.Screen
 import com.mobiapp.ui.components.*
-import com.mobiapp.ui.theme.*
+import com.mobiapp.ui.theme.Amber
 import java.text.SimpleDateFormat
 import java.util.*
 
 @Composable
 fun ReminderListScreen(
-    onNavigate: (String) -> Unit,
     onBack: () -> Unit,
+    onAddReminder: () -> Unit,
+    onEditReminder: (Long) -> Unit,
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val reminders by viewModel.reminders.collectAsStateWithLifecycle()
-    var showDelete by remember { mutableStateOf<ReminderEntity?>(null) }
+    val reminders by viewModel.reminders.collectAsState()
+    var deleteTarget by remember { mutableStateOf<ReminderEntity?>(null) }
+    val fmt = remember { SimpleDateFormat("MMM d, yyyy HH:mm", Locale.getDefault()) }
 
     Scaffold(
-        containerColor = Background,
-        topBar = { MobiTopBar("Smart Reminders", onBack = onBack) },
-        floatingActionButton = {
-            MobiFab(onClick = { onNavigate(Screen.AddEditReminder.createRoute()) })
-        }
+        topBar = { MobiTopBar("Reminders", onBack = onBack) },
+        floatingActionButton = { MobiFab(onAddReminder) }
     ) { padding ->
         if (reminders.isEmpty()) {
-            EmptyState("No reminders. Tap + to schedule one.", Icons.Default.Notifications)
+            EmptyState("No reminders yet. Tap + to add one.")
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier.padding(padding),
+                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(reminders, key = { it.id }) { reminder ->
-                    ReminderCard(
-                        reminder = reminder,
-                        onClick = { onNavigate(Screen.AddEditReminder.createRoute(reminder.id)) },
-                        onToggle = { viewModel.toggleEnabled(context, reminder) },
-                        onDelete = { showDelete = reminder }
-                    )
+                items(reminders) { reminder ->
+                    MobiCard {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(reminder.title, style = MaterialTheme.typography.titleMedium)
+                                Text(fmt.format(Date(reminder.triggerTimeMs)), style = MaterialTheme.typography.bodySmall, color = Amber)
+                                if (reminder.isRepeating) {
+                                    Text("Repeating", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                            Switch(
+                                checked = reminder.isEnabled,
+                                onCheckedChange = { viewModel.toggleEnabled(context, reminder) },
+                                colors = SwitchDefaults.colors(checkedThumbColor = Amber, checkedTrackColor = Amber.copy(alpha = 0.4f))
+                            )
+                            IconButton(onClick = { onEditReminder(reminder.id) }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Amber)
+                            }
+                            IconButton(onClick = { deleteTarget = reminder }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
                 }
-                item { Spacer(Modifier.height(80.dp)) }
             }
         }
     }
 
-    showDelete?.let { r ->
-        DeleteDialog("Delete reminder?",
-            onConfirm = { viewModel.delete(context, r); showDelete = null },
-            onDismiss = { showDelete = null }
+    deleteTarget?.let { reminder ->
+        DeleteDialog(
+            message = "Delete \"${reminder.title}\"?",
+            onConfirm = { viewModel.deleteReminder(context, reminder); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
         )
-    }
-}
-
-@Composable
-private fun ReminderCard(
-    reminder: ReminderEntity,
-    onClick: () -> Unit,
-    onToggle: () -> Unit,
-    onDelete: () -> Unit
-) {
-    val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val timeStr = timeFmt.format(Date(reminder.timeMillis))
-    val repeatStr = when (reminder.repeatMode) {
-        "daily" -> "Daily"
-        "weekdays" -> "Custom days"
-        else -> "Once"
-    }
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(SurfaceVariant)
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(reminder.message, color = if (reminder.isEnabled) OnBackground else OnSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 2)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(timeStr, color = Amber, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                TagChip(repeatStr)
-                TagChip(reminder.category, color = AmberLight)
-            }
-        }
-        Switch(
-            checked = reminder.isEnabled,
-            onCheckedChange = { onToggle() },
-            colors = SwitchDefaults.colors(checkedThumbColor = OnAmber, checkedTrackColor = Amber, uncheckedTrackColor = SurfaceContainer)
-        )
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.DeleteOutline, "Delete", tint = OnSurfaceVariant)
-        }
     }
 }

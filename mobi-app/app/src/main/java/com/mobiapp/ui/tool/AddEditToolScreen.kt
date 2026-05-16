@@ -9,102 +9,76 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mobiapp.data.entity.ToolEntity
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.process.*
-import com.mobiapp.ui.theme.*
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.theme.Amber
 
-private val ALL_TAGS = listOf("Video", "Audio", "Image", "Writing", "Code", "Translation", "Presentation", "Research", "Data", "Voice", "Design", "Security", "AI", "Automation", "Productivity")
-
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddEditToolScreen(
     toolId: Long?,
     onBack: () -> Unit,
+    onSaved: () -> Unit,
     viewModel: ToolViewModel = hiltViewModel()
 ) {
+    val existing by viewModel.getTool(toolId ?: -1L).collectAsState(initial = null)
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedTags by remember { mutableStateOf(setOf<String>()) }
-    var customTagInput by remember { mutableStateOf("") }
-    var isEdit by remember { mutableStateOf(false) }
+    var url by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf("") }
+    var initialized by remember { mutableStateOf(false) }
 
-    LaunchedEffect(toolId) {
-        toolId?.let { id ->
-            val t = viewModel.getById(id) ?: return@let
-            name = t.name; description = t.description
-            selectedTags = t.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }.toSet()
-            isEdit = true
+    LaunchedEffect(existing) {
+        if (!initialized && toolId != null && existing != null) {
+            name = existing!!.name
+            description = existing!!.description
+            url = existing!!.url
+            category = existing!!.category
+            tags = existing!!.tags
+            initialized = true
         }
     }
 
     Scaffold(
-        containerColor = Background,
-        topBar = { MobiTopBar(if (isEdit) "Edit Tool" else "Add Tool", onBack = onBack) }
+        topBar = { MobiTopBar(if (toolId == null) "New Tool" else "Edit Tool", onBack = onBack) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MobiTextField(value = name, onValueChange = { name = it }, label = "Tool Name")
-            MobiTextField(value = description, onValueChange = { description = it }, label = "Description & When to Use", minLines = 3)
-
-            Text("Tags", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ALL_TAGS.forEach { tag ->
-                    FilterChip(
-                        selected = tag in selectedTags,
-                        onClick = { selectedTags = if (tag in selectedTags) selectedTags - tag else selectedTags + tag },
-                        label = { Text(tag) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Amber.copy(alpha = 0.2f),
-                            selectedLabelColor = Amber,
-                            containerColor = SurfaceVariant,
-                            labelColor = OnSurfaceVariant
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = Outline, selectedBorderColor = Amber, enabled = true, selected = tag in selectedTags
-                        )
-                    )
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MobiTextField(
-                    value = customTagInput,
-                    onValueChange = { customTagInput = it },
-                    label = "Custom tag",
-                    modifier = Modifier.weight(1f)
-                )
-                Button(
-                    onClick = {
-                        val t = customTagInput.trim()
-                        if (t.isNotBlank()) { selectedTags = selectedTags + t; customTagInput = "" }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = SurfaceVariant, contentColor = Amber)
-                ) { Text("Add") }
-            }
-
-            if (selectedTags.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    selectedTags.filter { it !in ALL_TAGS }.forEach { tag ->
-                        TagChip(tag, onClick = { selectedTags = selectedTags - tag })
-                    }
-                }
-            }
-
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber))
+            OutlinedTextField(value = category, onValueChange = { category = it }, label = { Text("Category") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber))
+            OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text("Tags (comma separated)") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber))
+            OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("URL") }, modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber))
+            OutlinedTextField(
+                value = description, onValueChange = { description = it },
+                label = { Text("Description") },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                maxLines = 5,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
             Button(
                 onClick = {
-                    if (name.isBlank()) return@Button
-                    viewModel.save(
-                        ToolEntity(id = toolId ?: 0L, name = name.trim(), description = description.trim(), tags = selectedTags.joinToString(",")),
-                        onBack
-                    )
+                    if (name.isNotBlank()) {
+                        val entity = ToolEntity(
+                            id = toolId ?: 0L,
+                            name = name.trim(),
+                            description = description.trim(),
+                            url = url.trim(),
+                            category = category.trim(),
+                            tags = tags.trim(),
+                            isFavorite = existing?.isFavorite ?: false
+                        )
+                        viewModel.saveTool(entity) { onSaved() }
+                    }
                 },
-                enabled = name.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = OnAmber)
-            ) { Text(if (isEdit) "Save Changes" else "Add Tool") }
+                colors = ButtonDefaults.buttonColors(containerColor = Amber)
+            ) {
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     }
 }

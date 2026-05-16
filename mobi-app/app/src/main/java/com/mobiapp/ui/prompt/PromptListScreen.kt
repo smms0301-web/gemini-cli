@@ -1,87 +1,83 @@
 package com.mobiapp.ui.prompt
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobiapp.data.entity.PromptEntity
-import com.mobiapp.navigation.Screen
 import com.mobiapp.ui.components.*
-import com.mobiapp.ui.theme.*
+import com.mobiapp.ui.theme.Amber
 
 @Composable
 fun PromptListScreen(
-    onNavigate: (String) -> Unit,
     onBack: () -> Unit,
+    onAddPrompt: () -> Unit,
+    onPromptClick: (Long) -> Unit,
     viewModel: PromptViewModel = hiltViewModel()
 ) {
-    val prompts by viewModel.filtered.collectAsStateWithLifecycle()
-    val query by viewModel.query.collectAsStateWithLifecycle()
-    var showDelete by remember { mutableStateOf<PromptEntity?>(null) }
+    val query by viewModel.query.collectAsState()
+    val prompts by viewModel.prompts.collectAsState()
+    var deleteTarget by remember { mutableStateOf<PromptEntity?>(null) }
 
     Scaffold(
-        containerColor = Background,
         topBar = { MobiTopBar("AI Prompts Library", onBack = onBack) },
-        floatingActionButton = { MobiFab(onClick = { onNavigate(Screen.AddEditPrompt.createRoute()) }) }
+        floatingActionButton = { MobiFab(onAddPrompt) }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            MobiSearchBar(query, viewModel::setQuery, "Search prompts…", Modifier.padding(16.dp))
+        Column(modifier = Modifier.padding(padding).padding(16.dp)) {
+            MobiSearchBar(query = query, onQueryChange = { viewModel.query.value = it })
+            Spacer(Modifier.height(12.dp))
             if (prompts.isEmpty()) {
-                EmptyState("No prompts yet. Tap + to save your first prompt.", Icons.Default.Psychology)
+                EmptyState("No prompts yet. Tap + to add one.")
             } else {
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(prompts, key = { it.id }) { prompt ->
-                        PromptCard(
-                            prompt = prompt,
-                            onClick = { onNavigate(Screen.PromptDetail.createRoute(prompt.id)) },
-                            onDelete = { showDelete = prompt }
-                        )
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(prompts) { prompt ->
+                        MobiCard(onClick = { onPromptClick(prompt.id) }) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(prompt.title, style = MaterialTheme.typography.titleMedium)
+                                    if (prompt.category.isNotBlank()) {
+                                        Text(prompt.category, style = MaterialTheme.typography.bodySmall, color = Amber)
+                                    }
+                                    Text(prompt.content, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                                    if (prompt.tags.isNotBlank()) {
+                                        Row(modifier = Modifier.padding(top = 4.dp)) {
+                                            prompt.tags.split(",").take(3).forEach { TagChip(it.trim()) }
+                                        }
+                                    }
+                                }
+                                Column {
+                                    IconButton(onClick = { viewModel.toggleFavorite(prompt) }) {
+                                        Icon(
+                                            if (prompt.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                            contentDescription = "Favorite",
+                                            tint = Amber
+                                        )
+                                    }
+                                    IconButton(onClick = { deleteTarget = prompt }) {
+                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
                     }
-                    item { Spacer(Modifier.height(80.dp)) }
                 }
             }
         }
     }
 
-    showDelete?.let { p ->
-        DeleteDialog("Delete \"${p.title}\"?",
-            onConfirm = { viewModel.delete(p); showDelete = null },
-            onDismiss = { showDelete = null }
+    deleteTarget?.let { prompt ->
+        DeleteDialog(
+            message = "Delete \"${prompt.title}\"?",
+            onConfirm = { viewModel.deletePrompt(prompt); deleteTarget = null },
+            onDismiss = { deleteTarget = null }
         )
-    }
-}
-
-@Composable
-private fun PromptCard(prompt: PromptEntity, onClick: () -> Unit, onDelete: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-            .background(SurfaceVariant).clickable(onClick = onClick).padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(prompt.title, color = OnBackground, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            TagChip(prompt.category)
-            if (prompt.promptText.isNotBlank()) {
-                Text(prompt.promptText.take(100) + "…", color = OnSurfaceVariant, style = MaterialTheme.typography.bodySmall, maxLines = 2)
-            }
-        }
-        IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "Delete", tint = OnSurfaceVariant) }
-        Icon(Icons.Default.ChevronRight, null, tint = OnSurfaceVariant)
     }
 }

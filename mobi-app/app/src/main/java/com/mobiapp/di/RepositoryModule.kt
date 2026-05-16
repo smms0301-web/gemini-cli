@@ -10,9 +10,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
-    @Binds @Singleton abstract fun bindProcessRepository(impl: ProcessRepositoryImpl): ProcessRepository
-    @Binds @Singleton abstract fun bindReminderRepository(impl: ReminderRepositoryImpl): ReminderRepository
-    @Binds @Singleton abstract fun bindPromptRepository(impl: PromptRepositoryImpl): PromptRepository
-    @Binds @Singleton abstract fun bindToolRepository(impl: ToolRepositoryImpl): ToolRepository
-    @Binds @Singleton abstract fun bindNoteRepository(impl: NoteRepositoryImpl): NoteRepository
+    @Binds @Singleton abstract fun bindProcessRepo(impl: ProcessRepositoryImpl): ProcessRepository
+    @Binds @Singleton abstract fun bindReminderRepo(impl: ReminderRepositoryImpl): ReminderRepository
+    @Binds @Singleton abstract fun bindPromptRepo(impl: PromptRepositoryImpl): PromptRepository
+    @Binds @Singleton abstract fun bindToolRepo(impl: ToolRepositoryImpl): ToolRepository
+    @Binds @Singleton abstract fun bindNoteRepo(impl: NoteRepositoryImpl): NoteRepository
 }

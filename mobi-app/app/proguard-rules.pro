@@ -1,2 +1,1 @@
--keep class com.mobiapp.data.** { *; }
--keep class com.mobiapp.service.** { *; }
+# Add project specific ProGuard rules here.

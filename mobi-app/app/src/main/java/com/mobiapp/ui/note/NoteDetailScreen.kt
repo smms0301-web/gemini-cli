@@ -5,61 +5,60 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.mobiapp.data.entity.NoteEntity
-import com.mobiapp.navigation.Screen
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.theme.*
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.theme.Amber
 
 @Composable
 fun NoteDetailScreen(
     noteId: Long,
-    onNavigate: (String) -> Unit,
     onBack: () -> Unit,
+    onEdit: (Long) -> Unit,
     viewModel: NoteViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    var note by remember { mutableStateOf<NoteEntity?>(null) }
-    LaunchedEffect(noteId) { note = viewModel.getById(noteId) }
+    val note by viewModel.getNote(noteId).collectAsState(initial = null)
 
     Scaffold(
-        containerColor = Background,
         topBar = {
-            MobiTopBar(note?.title ?: "Note", onBack = onBack, actions = {
-                note?.let { n ->
+            MobiTopBar(
+                title = note?.title ?: "Note",
+                onBack = onBack,
+                actions = {
                     IconButton(onClick = {
-                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "${n.title}\n\n${n.body}")
+                        note?.let {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, it.title)
+                                putExtra(Intent.EXTRA_TEXT, "${it.title}\n\n${it.content}")
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share Note"))
                         }
-                        context.startActivity(Intent.createChooser(shareIntent, "Share Note"))
-                    }) { Icon(Icons.Default.Share, "Share", tint = OnSurfaceVariant) }
-                    IconButton(onClick = { viewModel.togglePin(n) }) {
-                        Icon(Icons.Default.PushPin, null, tint = if (n.isPinned) Amber else OnSurfaceVariant)
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Amber)
                     }
-                    IconButton(onClick = { onNavigate(Screen.AddEditNote.createRoute(noteId)) }) {
-                        Icon(Icons.Default.Edit, "Edit", tint = Amber)
+                    IconButton(onClick = { onEdit(noteId) }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Amber)
                     }
                 }
-            })
+            )
         }
     ) { padding ->
         note?.let { n ->
             Column(
-                modifier = Modifier.fillMaxSize().padding(padding)
-                    .verticalScroll(rememberScrollState()).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .padding(padding)
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Text(n.title, color = OnBackground, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                HorizontalDivider(color = Outline)
-                Text(n.body, color = OnBackground, style = MaterialTheme.typography.bodyLarge)
+                Text(n.content, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }

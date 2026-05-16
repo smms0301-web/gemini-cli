@@ -2,32 +2,13 @@ package com.mobiapp.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mobiapp.data.entity.*
 import com.mobiapp.repository.*
 import com.mobiapp.util.FuzzySearch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class SearchResult(
-    val id: Long,
-    val module: String,       // "Process", "Reminder", "Prompt", "Tool", "Note"
-    val title: String,
-    val snippet: String,
-    val tags: String = ""
-)
-
-data class HomeUiState(
-    val processCount: Int = 0,
-    val reminderCount: Int = 0,
-    val promptCount: Int = 0,
-    val toolCount: Int = 0,
-    val noteCount: Int = 0,
-    val searchQuery: String = "",
-    val searchResults: Map<String, List<SearchResult>> = emptyMap(),
-    val isSearching: Boolean = false
-)
+data class SearchResult(val module: String, val id: Long, val title: String, val subtitle: String)
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -38,96 +19,49 @@ class HomeViewModel @Inject constructor(
     private val noteRepo: NoteRepository
 ) : ViewModel() {
 
-    private val _query = MutableStateFlow("")
-    private val _counts = MutableStateFlow(HomeUiState())
+    val query = MutableStateFlow("")
 
-    val uiState: StateFlow<HomeUiState> = _counts.asStateFlow()
-
-    init {
-        viewModelScope.launch {
+    val results: StateFlow<Map<String, List<SearchResult>>> = query
+        .debounce(300)
+        .combine(
             combine(
-                processRepo.count(),
-                reminderRepo.activeCount(),
-                promptRepo.count(),
-                toolRepo.count(),
-                noteRepo.count()
-            ) { pc, rc, prc, tc, nc ->
-                _counts.value.copy(processCount = pc, reminderCount = rc, promptCount = prc, toolCount = tc, noteCount = nc)
-            }.collect { _counts.value = it }
-        }
+                processRepo.getAllProcesses(),
+                reminderRepo.getAllReminders(),
+                promptRepo.getAllPrompts(),
+                toolRepo.getAllTools(),
+                noteRepo.getAllNotes()
+            ) { processes, reminders, prompts, tools, notes ->
+                Quintuple(processes, reminders, prompts, tools, notes)
+            }
+        ) { q, data ->
+            if (q.isBlank()) return@combine emptyMap()
+            val map = mutableMapOf<String, MutableList<SearchResult>>()
 
-        viewModelScope.launch {
-            _query.debounce(150).collect { q -> if (q.isNotBlank()) performSearch(q) else clearSearch() }
+            data.first.filter { FuzzySearch.matches(q, it.title + " " + it.description) }.forEach {
+                map.getOrPut("Processes") { mutableListOf() }
+                    .add(SearchResult("Processes", it.id, it.title, it.category))
+            }
+            data.second.filter { FuzzySearch.matches(q, it.title + " " + it.description) }.forEach {
+                map.getOrPut("Reminders") { mutableListOf() }
+                    .add(SearchResult("Reminders", it.id, it.title, it.description))
+            }
+            data.third.filter { FuzzySearch.matches(q, it.title + " " + it.content + " " + it.tags) }.forEach {
+                map.getOrPut("Prompts") { mutableListOf() }
+                    .add(SearchResult("Prompts", it.id, it.title, it.category))
+            }
+            data.fourth.filter { FuzzySearch.matches(q, it.name + " " + it.description + " " + it.tags) }.forEach {
+                map.getOrPut("Tools") { mutableListOf() }
+                    .add(SearchResult("Tools", it.id, it.name, it.category))
+            }
+            data.fifth.filter { FuzzySearch.matches(q, it.title + " " + it.content) }.forEach {
+                map.getOrPut("Notes") { mutableListOf() }
+                    .add(SearchResult("Notes", it.id, it.title, it.content.take(60)))
+            }
+            map
         }
-    }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    fun onSearchQueryChange(q: String) {
-        _query.value = q
-        _counts.update { it.copy(searchQuery = q, isSearching = q.isNotBlank()) }
-        if (q.isBlank()) clearSearch()
-    }
-
-    private fun clearSearch() {
-        _counts.update { it.copy(searchResults = emptyMap(), isSearching = false) }
-    }
-
-    private suspend fun performSearch(query: String) {
-        val results = mutableMapOf<String, MutableList<SearchResult>>()
-
-        // Process
-        val processes = processRepo.search(query)
-        val fuzzyProcesses = processRepo.getAll().first().filter { p ->
-            FuzzySearch.matches(query, p.title) || FuzzySearch.matches(query, p.category) || FuzzySearch.matches(query, p.siteTag)
-        }
-        (processes + fuzzyProcesses).distinctBy { it.id }.take(5).forEach { p ->
-            results.getOrPut("Process") { mutableListOf() }.add(
-                SearchResult(p.id, "Process", p.title, "${p.category} • ${p.siteTag}", "")
-            )
-        }
-
-        // Reminder
-        val reminders = reminderRepo.search(query)
-        val fuzzyReminders = reminderRepo.getAll().first().filter { FuzzySearch.matches(query, it.message) }
-        (reminders + fuzzyReminders).distinctBy { it.id }.take(5).forEach { r ->
-            results.getOrPut("Reminder") { mutableListOf() }.add(
-                SearchResult(r.id, "Reminder", r.message.take(60), r.category, "")
-            )
-        }
-
-        // Prompt
-        val prompts = promptRepo.search(query)
-        val fuzzyPrompts = promptRepo.getAll().first().filter { p ->
-            FuzzySearch.matches(query, p.title) || FuzzySearch.matches(query, p.category)
-        }
-        (prompts + fuzzyPrompts).distinctBy { it.id }.take(5).forEach { p ->
-            results.getOrPut("Prompt") { mutableListOf() }.add(
-                SearchResult(p.id, "Prompt", p.title, p.category, "")
-            )
-        }
-
-        // Tool
-        val tools = toolRepo.search(query)
-        val fuzzyTools = toolRepo.getAll().first().filter { t ->
-            FuzzySearch.matches(query, t.name) ||
-            t.tags.split(",").any { tag -> FuzzySearch.matches(query, tag.trim()) }
-        }
-        (tools + fuzzyTools).distinctBy { it.id }.take(5).forEach { t ->
-            results.getOrPut("Tool") { mutableListOf() }.add(
-                SearchResult(t.id, "Tool", t.name, t.description.take(80), t.tags)
-            )
-        }
-
-        // Note
-        val notes = noteRepo.search(query)
-        val fuzzyNotes = noteRepo.getAll().first().filter { n ->
-            FuzzySearch.matches(query, n.title) || FuzzySearch.matches(query, n.body.take(100))
-        }
-        (notes + fuzzyNotes).distinctBy { it.id }.take(5).forEach { n ->
-            results.getOrPut("Note") { mutableListOf() }.add(
-                SearchResult(n.id, "Note", n.title, n.body.take(80), "")
-            )
-        }
-
-        _counts.update { it.copy(searchResults = results) }
-    }
+    fun onQueryChange(q: String) { query.value = q }
 }
+
+private data class Quintuple<A, B, C, D, E>(val first: A, val second: B, val third: C, val fourth: D, val fifth: E)

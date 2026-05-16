@@ -7,9 +7,10 @@ import androidx.room.PrimaryKey
 data class PromptEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
-    val promptText: String,
-    val category: String,
-    val personalNote: String = "",
+    val content: String,
+    val category: String = "",
+    val tags: String = "",
+    val isFavorite: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

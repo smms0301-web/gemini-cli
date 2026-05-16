@@ -6,95 +6,101 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mobiapp.data.entity.NoteEntity
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.theme.*
-
-private val NOTE_COLORS = listOf(
-    "none" to NoteAccentNone,
-    "amber" to NoteAccentAmber,
-    "blue" to NoteAccentBlue,
-    "green" to NoteAccentGreen,
-    "red" to NoteAccentRed,
-    "purple" to NoteAccentPurple
-)
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.theme.Amber
+import com.mobiapp.ui.theme.NoteColors
 
 @Composable
 fun AddEditNoteScreen(
     noteId: Long?,
     onBack: () -> Unit,
-    onSaved: (Long) -> Unit,
+    onSaved: () -> Unit,
     viewModel: NoteViewModel = hiltViewModel()
 ) {
+    val existing by viewModel.getNote(noteId ?: -1L).collectAsState(initial = null)
     var title by remember { mutableStateOf("") }
-    var body by remember { mutableStateOf("") }
-    var colorAccent by remember { mutableStateOf("none") }
-    var isPinned by remember { mutableStateOf(false) }
-    var isEdit by remember { mutableStateOf(false) }
+    var content by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf(NoteColors[0]) }
+    var initialized by remember { mutableStateOf(false) }
 
-    LaunchedEffect(noteId) {
-        noteId?.let { id ->
-            val n = viewModel.getById(id) ?: return@let
-            title = n.title; body = n.body; colorAccent = n.colorAccent; isPinned = n.isPinned; isEdit = true
+    LaunchedEffect(existing) {
+        if (!initialized && noteId != null && existing != null) {
+            title = existing!!.title
+            content = existing!!.content
+            try { selectedColor = Color(android.graphics.Color.parseColor(existing!!.colorHex)) } catch (_: Exception) {}
+            initialized = true
         }
     }
 
     Scaffold(
-        containerColor = Background,
-        topBar = {
-            MobiTopBar(if (isEdit) "Edit Note" else "New Note", onBack = onBack, actions = {
-                IconButton(onClick = { isPinned = !isPinned }) {
-                    Icon(Icons.Default.PushPin, null, tint = if (isPinned) Amber else OnSurfaceVariant)
-                }
-            })
-        }
+        topBar = { MobiTopBar(if (noteId == null) "New Note" else "Edit Note", onBack = onBack) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MobiTextField(value = title, onValueChange = { title = it }, label = "Title")
-            MobiTextField(value = body, onValueChange = { body = it }, label = "Note", minLines = 8)
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                label = { Text("Title") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
+            OutlinedTextField(
+                value = content, onValueChange = { content = it },
+                label = { Text("Content") },
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                maxLines = 12,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
 
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Color:", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                NOTE_COLORS.forEach { (key, color) ->
+            Text("Note Color", style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                NoteColors.forEach { color ->
                     Box(
                         modifier = Modifier
-                            .size(28.dp).clip(CircleShape)
-                            .background(if (color == NoteAccentNone) SurfaceContainer else color)
-                            .border(if (colorAccent == key) 2.dp else 0.5.dp,
-                                if (colorAccent == key) Amber else Outline, CircleShape)
-                            .clickable { colorAccent = key }
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .then(
+                                if (color == selectedColor)
+                                    Modifier.border(2.dp, Amber, CircleShape)
+                                else Modifier
+                            )
+                            .clickable { selectedColor = color }
                     )
                 }
             }
 
             Button(
                 onClick = {
-                    if (title.isBlank()) return@Button
-                    viewModel.save(
-                        NoteEntity(id = noteId ?: 0L, title = title.trim(), body = body.trim(), colorAccent = colorAccent, isPinned = isPinned),
-                        onSaved
-                    )
+                    if (title.isNotBlank()) {
+                        val colorHex = "#%06X".format(0xFFFFFF and selectedColor.value.toInt())
+                        val entity = NoteEntity(
+                            id = noteId ?: 0L,
+                            title = title.trim(),
+                            content = content.trim(),
+                            colorHex = colorHex,
+                            isPinned = existing?.isPinned ?: false
+                        )
+                        viewModel.saveNote(entity) { onSaved() }
+                    }
                 },
-                enabled = title.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = OnAmber)
-            ) { Text(if (isEdit) "Save Changes" else "Save Note") }
+                colors = ButtonDefaults.buttonColors(containerColor = Amber)
+            ) {
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     }
 }

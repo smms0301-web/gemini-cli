@@ -7,69 +7,89 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mobiapp.ui.home.HomeScreen
-import com.mobiapp.ui.note.*
-import com.mobiapp.ui.process.*
-import com.mobiapp.ui.prompt.*
-import com.mobiapp.ui.reminder.*
+import com.mobiapp.ui.note.AddEditNoteScreen
+import com.mobiapp.ui.note.NoteDetailScreen
+import com.mobiapp.ui.note.NoteListScreen
+import com.mobiapp.ui.process.AddEditProcessScreen
+import com.mobiapp.ui.process.AddEditStepScreen
+import com.mobiapp.ui.process.PdfExportScreen
+import com.mobiapp.ui.process.ProcessDetailScreen
+import com.mobiapp.ui.process.ProcessListScreen
+import com.mobiapp.ui.process.StepDetailScreen
+import com.mobiapp.ui.prompt.AddEditPromptScreen
+import com.mobiapp.ui.prompt.PromptDetailScreen
+import com.mobiapp.ui.prompt.PromptListScreen
+import com.mobiapp.ui.reminder.AddEditReminderScreen
+import com.mobiapp.ui.reminder.ReminderListScreen
 import com.mobiapp.ui.settings.SettingsScreen
-import com.mobiapp.ui.tool.*
+import com.mobiapp.ui.tool.AddEditToolScreen
+import com.mobiapp.ui.tool.ToolDetailScreen
+import com.mobiapp.ui.tool.ToolListScreen
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    val navigate: (String) -> Unit = { navController.navigate(it) }
     val goBack: () -> Unit = { navController.popBackStack() }
 
     NavHost(navController = navController, startDestination = Screen.Home.route) {
 
         composable(Screen.Home.route) {
-            HomeScreen(onNavigate = navigate)
+            HomeScreen(
+                onNavigateToProcess = { navController.navigate(Screen.ProcessList.route) },
+                onNavigateToReminder = { navController.navigate(Screen.ReminderList.route) },
+                onNavigateToPrompt = { navController.navigate(Screen.PromptList.route) },
+                onNavigateToTool = { navController.navigate(Screen.ToolList.route) },
+                onNavigateToNote = { navController.navigate(Screen.NoteList.route) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
+            )
         }
 
-        // ─── Process module ───────────────────────────────────
         composable(Screen.ProcessList.route) {
-            ProcessListScreen(onNavigate = navigate, onBack = goBack)
+            ProcessListScreen(
+                onBack = goBack,
+                onAddProcess = { navController.navigate(Screen.AddEditProcess.route()) },
+                onProcessClick = { id -> navController.navigate(Screen.ProcessDetail.route(id)) }
+            )
         }
         composable(
-            Screen.ProcessDetail.route,
-            arguments = listOf(navArgument("processId") { type = NavType.LongType })
+            route = Screen.ProcessDetail.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
         ) { entry ->
             ProcessDetailScreen(
-                processId = entry.arguments?.getLong("processId") ?: 0L,
-                onNavigate = navigate,
-                onBack = goBack
-            )
-        }
-        composable(
-            Screen.AddEditProcess.route,
-            arguments = listOf(navArgument("processId") { type = NavType.LongType; defaultValue = -1L })
-        ) { entry ->
-            val pid = entry.arguments?.getLong("processId").takeIf { it != -1L }
-            AddEditProcessScreen(
-                processId = pid,
+                processId = entry.arguments?.getLong("id") ?: 0L,
                 onBack = goBack,
-                onSaved = { id ->
-                    navController.popBackStack()
-                    if (pid == null) navController.navigate(Screen.ProcessDetail.createRoute(id))
-                }
+                onEdit = { id -> navController.navigate(Screen.AddEditProcess.route(id)) },
+                onAddStep = { pid -> navController.navigate(Screen.AddEditStep.route(pid)) },
+                onStepClick = { pid, sid -> navController.navigate(Screen.StepDetail.route(pid, sid)) },
+                onExportPdf = { pid -> navController.navigate(Screen.PdfExport.route(pid)) }
             )
         }
         composable(
-            Screen.StepDetail.route,
+            route = Screen.AddEditProcess.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
+        ) { entry ->
+            AddEditProcessScreen(
+                processId = entry.arguments?.getLong("id")?.takeIf { it != -1L },
+                onBack = goBack,
+                onSaved = goBack
+            )
+        }
+        composable(
+            route = Screen.StepDetail.route,
             arguments = listOf(
-                navArgument("stepId") { type = NavType.LongType },
-                navArgument("processId") { type = NavType.LongType }
+                navArgument("processId") { type = NavType.LongType },
+                navArgument("stepId") { type = NavType.LongType }
             )
         ) { entry ->
             StepDetailScreen(
-                stepId = entry.arguments?.getLong("stepId") ?: 0L,
                 processId = entry.arguments?.getLong("processId") ?: 0L,
-                onNavigate = navigate,
-                onBack = goBack
+                stepId = entry.arguments?.getLong("stepId") ?: 0L,
+                onBack = goBack,
+                onEdit = { pid, sid -> navController.navigate(Screen.AddEditStep.route(pid, sid)) }
             )
         }
         composable(
-            Screen.AddEditStep.route,
+            route = Screen.AddEditStep.route,
             arguments = listOf(
                 navArgument("processId") { type = NavType.LongType },
                 navArgument("stepId") { type = NavType.LongType; defaultValue = -1L }
@@ -77,13 +97,13 @@ fun AppNavigation() {
         ) { entry ->
             AddEditStepScreen(
                 processId = entry.arguments?.getLong("processId") ?: 0L,
-                stepId = entry.arguments?.getLong("stepId").takeIf { it != -1L },
+                stepId = entry.arguments?.getLong("stepId")?.takeIf { it != -1L },
                 onBack = goBack,
                 onSaved = goBack
             )
         }
         composable(
-            Screen.PdfExport.route,
+            route = Screen.PdfExport.route,
             arguments = listOf(navArgument("processId") { type = NavType.LongType })
         ) { entry ->
             PdfExportScreen(
@@ -92,94 +112,108 @@ fun AppNavigation() {
             )
         }
 
-        // ─── Reminder module ──────────────────────────────────
         composable(Screen.ReminderList.route) {
-            ReminderListScreen(onNavigate = navigate, onBack = goBack)
+            ReminderListScreen(
+                onBack = goBack,
+                onAddReminder = { navController.navigate(Screen.AddEditReminder.route()) },
+                onEditReminder = { id -> navController.navigate(Screen.AddEditReminder.route(id)) }
+            )
         }
         composable(
-            Screen.AddEditReminder.route,
-            arguments = listOf(navArgument("reminderId") { type = NavType.LongType; defaultValue = -1L })
+            route = Screen.AddEditReminder.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
         ) { entry ->
             AddEditReminderScreen(
-                reminderId = entry.arguments?.getLong("reminderId").takeIf { it != -1L },
-                onBack = goBack
+                reminderId = entry.arguments?.getLong("id")?.takeIf { it != -1L },
+                onBack = goBack,
+                onSaved = goBack
             )
         }
 
-        // ─── Prompt module ────────────────────────────────────
         composable(Screen.PromptList.route) {
-            PromptListScreen(onNavigate = navigate, onBack = goBack)
+            PromptListScreen(
+                onBack = goBack,
+                onAddPrompt = { navController.navigate(Screen.AddEditPrompt.route()) },
+                onPromptClick = { id -> navController.navigate(Screen.PromptDetail.route(id)) }
+            )
         }
         composable(
-            Screen.PromptDetail.route,
-            arguments = listOf(navArgument("promptId") { type = NavType.LongType })
+            route = Screen.PromptDetail.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
         ) { entry ->
             PromptDetailScreen(
-                promptId = entry.arguments?.getLong("promptId") ?: 0L,
-                onNavigate = navigate,
-                onBack = goBack
+                promptId = entry.arguments?.getLong("id") ?: 0L,
+                onBack = goBack,
+                onEdit = { id -> navController.navigate(Screen.AddEditPrompt.route(id)) }
             )
         }
         composable(
-            Screen.AddEditPrompt.route,
-            arguments = listOf(navArgument("promptId") { type = NavType.LongType; defaultValue = -1L })
+            route = Screen.AddEditPrompt.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
         ) { entry ->
             AddEditPromptScreen(
-                promptId = entry.arguments?.getLong("promptId").takeIf { it != -1L },
-                onBack = goBack
+                promptId = entry.arguments?.getLong("id")?.takeIf { it != -1L },
+                onBack = goBack,
+                onSaved = goBack
             )
         }
 
-        // ─── Tool module ──────────────────────────────────────
         composable(Screen.ToolList.route) {
-            ToolListScreen(onNavigate = navigate, onBack = goBack)
+            ToolListScreen(
+                onBack = goBack,
+                onAddTool = { navController.navigate(Screen.AddEditTool.route()) },
+                onToolClick = { id -> navController.navigate(Screen.ToolDetail.route(id)) }
+            )
         }
         composable(
-            Screen.ToolDetail.route,
-            arguments = listOf(navArgument("toolId") { type = NavType.LongType })
+            route = Screen.ToolDetail.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
         ) { entry ->
             ToolDetailScreen(
-                toolId = entry.arguments?.getLong("toolId") ?: 0L,
-                onNavigate = navigate,
-                onBack = goBack
+                toolId = entry.arguments?.getLong("id") ?: 0L,
+                onBack = goBack,
+                onEdit = { id -> navController.navigate(Screen.AddEditTool.route(id)) }
             )
         }
         composable(
-            Screen.AddEditTool.route,
-            arguments = listOf(navArgument("toolId") { type = NavType.LongType; defaultValue = -1L })
+            route = Screen.AddEditTool.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
         ) { entry ->
             AddEditToolScreen(
-                toolId = entry.arguments?.getLong("toolId").takeIf { it != -1L },
-                onBack = goBack
+                toolId = entry.arguments?.getLong("id")?.takeIf { it != -1L },
+                onBack = goBack,
+                onSaved = goBack
             )
         }
 
-        // ─── Note module ──────────────────────────────────────
         composable(Screen.NoteList.route) {
-            NoteListScreen(onNavigate = navigate, onBack = goBack)
+            NoteListScreen(
+                onBack = goBack,
+                onAddNote = { navController.navigate(Screen.AddEditNote.route()) },
+                onNoteClick = { id -> navController.navigate(Screen.NoteDetail.route(id)) }
+            )
         }
         composable(
-            Screen.NoteDetail.route,
-            arguments = listOf(navArgument("noteId") { type = NavType.LongType })
+            route = Screen.NoteDetail.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
         ) { entry ->
             NoteDetailScreen(
-                noteId = entry.arguments?.getLong("noteId") ?: 0L,
-                onNavigate = navigate,
-                onBack = goBack
+                noteId = entry.arguments?.getLong("id") ?: 0L,
+                onBack = goBack,
+                onEdit = { id -> navController.navigate(Screen.AddEditNote.route(id)) }
             )
         }
         composable(
-            Screen.AddEditNote.route,
-            arguments = listOf(navArgument("noteId") { type = NavType.LongType; defaultValue = -1L })
+            route = Screen.AddEditNote.route,
+            arguments = listOf(navArgument("id") { type = NavType.LongType; defaultValue = -1L })
         ) { entry ->
             AddEditNoteScreen(
-                noteId = entry.arguments?.getLong("noteId").takeIf { it != -1L },
+                noteId = entry.arguments?.getLong("id")?.takeIf { it != -1L },
                 onBack = goBack,
-                onSaved = { goBack() }
+                onSaved = goBack
             )
         }
 
-        // ─── Settings ─────────────────────────────────────────
         composable(Screen.Settings.route) {
             SettingsScreen(onBack = goBack)
         }

@@ -7,8 +7,10 @@ import androidx.room.PrimaryKey
 data class ToolEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
-    val description: String,
-    val tags: String, // comma-separated
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val description: String = "",
+    val url: String = "",
+    val tags: String = "",
+    val category: String = "",
+    val isFavorite: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
 )

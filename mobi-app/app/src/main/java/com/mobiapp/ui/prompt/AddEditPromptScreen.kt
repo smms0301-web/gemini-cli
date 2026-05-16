@@ -9,57 +9,84 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mobiapp.data.entity.PromptEntity
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.process.*
-import com.mobiapp.ui.theme.*
-
-private val CATEGORIES = listOf("Report Writing", "Email", "Translation", "Training Content", "Analysis", "CCTV", "General", "Code", "Research")
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.theme.Amber
 
 @Composable
 fun AddEditPromptScreen(
     promptId: Long?,
     onBack: () -> Unit,
+    onSaved: () -> Unit,
     viewModel: PromptViewModel = hiltViewModel()
 ) {
+    val existing by viewModel.getPrompt(promptId ?: -1L).collectAsState(initial = null)
     var title by remember { mutableStateOf("") }
-    var promptText by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(CATEGORIES.last()) }
-    var note by remember { mutableStateOf("") }
-    var isEdit by remember { mutableStateOf(false) }
+    var content by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf("") }
+    var tags by remember { mutableStateOf("") }
+    var initialized by remember { mutableStateOf(false) }
 
-    LaunchedEffect(promptId) {
-        promptId?.let { id ->
-            val p = viewModel.getById(id) ?: return@let
-            title = p.title; promptText = p.promptText; category = p.category; note = p.personalNote; isEdit = true
+    LaunchedEffect(existing) {
+        if (!initialized && promptId != null && existing != null) {
+            title = existing!!.title
+            content = existing!!.content
+            category = existing!!.category
+            tags = existing!!.tags
+            initialized = true
         }
     }
 
     Scaffold(
-        containerColor = androidx.compose.ui.graphics.Color(0xFF0F0F0F),
-        topBar = { MobiTopBar(if (isEdit) "Edit Prompt" else "New Prompt", onBack = onBack) }
+        topBar = { MobiTopBar(if (promptId == null) "New Prompt" else "Edit Prompt", onBack = onBack) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MobiTextField(value = title, onValueChange = { title = it }, label = "Prompt Title")
-            MobiTextField(value = promptText, onValueChange = { promptText = it }, label = "Prompt Text", minLines = 6)
-            MobiTextField(value = note, onValueChange = { note = it }, label = "Personal Note (optional)", minLines = 2)
-            Text("Category", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-            ChipSelector(CATEGORIES, category) { category = it }
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                label = { Text("Title") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
+            OutlinedTextField(
+                value = category, onValueChange = { category = it },
+                label = { Text("Category") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
+            OutlinedTextField(
+                value = tags, onValueChange = { tags = it },
+                label = { Text("Tags (comma separated)") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
+            OutlinedTextField(
+                value = content, onValueChange = { content = it },
+                label = { Text("Prompt Text") },
+                modifier = Modifier.fillMaxWidth().height(200.dp),
+                maxLines = 12,
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
             Button(
                 onClick = {
-                    if (title.isBlank() || promptText.isBlank()) return@Button
-                    viewModel.save(
-                        PromptEntity(id = promptId ?: 0L, title = title.trim(), promptText = promptText.trim(), category = category, personalNote = note.trim()),
-                        onBack
-                    )
+                    if (title.isNotBlank() && content.isNotBlank()) {
+                        val entity = PromptEntity(
+                            id = promptId ?: 0L,
+                            title = title.trim(),
+                            content = content.trim(),
+                            category = category.trim(),
+                            tags = tags.trim(),
+                            isFavorite = existing?.isFavorite ?: false
+                        )
+                        viewModel.savePrompt(entity) { onSaved() }
+                    }
                 },
-                enabled = title.isNotBlank() && promptText.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = OnAmber)
-            ) { Text(if (isEdit) "Save Changes" else "Save Prompt") }
+                colors = ButtonDefaults.buttonColors(containerColor = Amber)
+            ) {
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     }
 }

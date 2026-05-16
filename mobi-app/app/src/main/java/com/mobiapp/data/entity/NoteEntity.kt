@@ -7,8 +7,8 @@ import androidx.room.PrimaryKey
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
-    val body: String,
-    val colorAccent: String = "none", // none, amber, blue, green, red, purple
+    val content: String = "",
+    val colorHex: String = "#1C1C1C",
     val isPinned: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

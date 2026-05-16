@@ -11,29 +11,31 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class NoteViewModel @Inject constructor(private val repo: NoteRepository) : ViewModel() {
+class NoteViewModel @Inject constructor(
+    private val repo: NoteRepository
+) : ViewModel() {
 
-    val notes: StateFlow<List<NoteEntity>> = repo.getAll()
+    val query = MutableStateFlow("")
+
+    private val allNotes = repo.getAllNotes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
-
-    val filtered: StateFlow<List<NoteEntity>> = combine(notes, _query) { list, q ->
+    val notes: StateFlow<List<NoteEntity>> = query.combine(allNotes) { q, list ->
         if (q.isBlank()) list
-        else list.filter { n -> FuzzySearch.matches(q, n.title) || q.lowercase() in n.body.lowercase() }
+        else list.filter { FuzzySearch.matches(q, "${it.title} ${it.content}") }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setQuery(q: String) { _query.value = q }
+    fun getNote(id: Long) = repo.getNoteById(id)
 
-    suspend fun getById(id: Long) = repo.getById(id)
-
-    fun save(note: NoteEntity, onDone: (Long) -> Unit) = viewModelScope.launch {
-        val id = if (note.id == 0L) repo.insert(note) else { repo.update(note.copy(updatedAt = System.currentTimeMillis())); note.id }
-        onDone(id)
+    fun saveNote(note: NoteEntity, onDone: () -> Unit) = viewModelScope.launch {
+        if (note.id == 0L) repo.insertNote(note)
+        else repo.updateNote(note.copy(updatedAt = System.currentTimeMillis()))
+        onDone()
     }
 
-    fun delete(note: NoteEntity) = viewModelScope.launch { repo.delete(note) }
+    fun togglePin(note: NoteEntity) = viewModelScope.launch {
+        repo.updateNote(note.copy(isPinned = !note.isPinned))
+    }
 
-    fun togglePin(note: NoteEntity) = viewModelScope.launch { repo.setPinned(note.id, !note.isPinned) }
+    fun deleteNote(note: NoteEntity) = viewModelScope.launch { repo.deleteNote(note) }
 }

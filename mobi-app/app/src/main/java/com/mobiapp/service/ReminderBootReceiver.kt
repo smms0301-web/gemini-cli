@@ -11,14 +11,15 @@ import androidx.room.Room
 
 class ReminderBootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED &&
-            intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
-
+        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, "mobi_app.db").build()
         CoroutineScope(Dispatchers.IO).launch {
-            val db = Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME).build()
-            val reminders = db.reminderDao().getAllEnabled()
-            reminders.forEach { reminder ->
-                ReminderScheduler.schedule(context, reminder)
+            val reminders = db.reminderDao().getEnabledReminders()
+            val now = System.currentTimeMillis()
+            for (r in reminders) {
+                if (r.triggerTimeMs > now) {
+                    ReminderScheduler.schedule(context, r)
+                }
             }
             db.close()
         }

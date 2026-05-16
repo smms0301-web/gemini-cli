@@ -11,40 +11,37 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class ToolViewModel @Inject constructor(private val repo: ToolRepository) : ViewModel() {
+class ToolViewModel @Inject constructor(
+    private val repo: ToolRepository
+) : ViewModel() {
 
-    val tools: StateFlow<List<ToolEntity>> = repo.getAll()
+    val query = MutableStateFlow("")
+
+    private val allTools = repo.getAllTools()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _query = MutableStateFlow("")
-    val query: StateFlow<String> = _query
-
-    /**
-     * Multi-tag AND filter with fuzzy matching:
-     * Each space-separated token must match at least one tag on the tool.
-     * Single token matches name/description too.
-     */
-    val filtered: StateFlow<List<ToolEntity>> = combine(tools, _query) { list, q ->
-        if (q.isBlank()) return@combine list
-        val tokens = q.trim().lowercase().split("\\s+".toRegex()).filter { it.isNotBlank() }
-        list.filter { tool ->
-            val tags = tool.tags.split(",").map { it.trim().lowercase() }
-            tokens.all { token ->
-                tags.any { tag -> FuzzySearch.matches(token, tag) } ||
-                FuzzySearch.matches(token, tool.name) ||
-                FuzzySearch.matches(token, tool.description)
+    val tools: StateFlow<List<ToolEntity>> = query.combine(allTools) { q, list ->
+        if (q.isBlank()) list
+        else {
+            val tokens = q.trim().lowercase().split("\\s+".toRegex())
+            list.filter { tool ->
+                val haystack = "${tool.name} ${tool.description} ${tool.tags} ${tool.category}"
+                FuzzySearch.matchesAll(tokens, haystack)
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun setQuery(q: String) { _query.value = q }
+    fun getTool(id: Long) = repo.getToolById(id)
 
-    suspend fun getById(id: Long) = repo.getById(id)
-
-    fun save(tool: ToolEntity, onDone: () -> Unit) = viewModelScope.launch {
-        if (tool.id == 0L) repo.insert(tool) else repo.update(tool.copy(updatedAt = System.currentTimeMillis()))
+    fun saveTool(tool: ToolEntity, onDone: () -> Unit) = viewModelScope.launch {
+        if (tool.id == 0L) repo.insertTool(tool)
+        else repo.updateTool(tool)
         onDone()
     }
 
-    fun delete(tool: ToolEntity) = viewModelScope.launch { repo.delete(tool) }
+    fun toggleFavorite(tool: ToolEntity) = viewModelScope.launch {
+        repo.updateTool(tool.copy(isFavorite = !tool.isFavorite))
+    }
+
+    fun deleteTool(tool: ToolEntity) = viewModelScope.launch { repo.deleteTool(tool) }
 }

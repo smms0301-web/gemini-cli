@@ -6,27 +6,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ToolDao {
-    @Query("SELECT * FROM tools ORDER BY name ASC")
-    fun getAll(): Flow<List<ToolEntity>>
+    @Query("SELECT * FROM tools ORDER BY isFavorite DESC, name ASC")
+    fun getAllTools(): Flow<List<ToolEntity>>
 
     @Query("SELECT * FROM tools WHERE id = :id")
-    suspend fun getById(id: Long): ToolEntity?
-
-    @Query("SELECT * FROM tools WHERE name LIKE '%' || :q || '%' OR description LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'")
-    suspend fun search(q: String): List<ToolEntity>
-
-    @Query("SELECT * FROM tools ORDER BY name ASC")
-    suspend fun getAllSync(): List<ToolEntity>
+    fun getToolById(id: Long): Flow<ToolEntity?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(tool: ToolEntity): Long
+    suspend fun insertTool(tool: ToolEntity): Long
 
     @Update
-    suspend fun update(tool: ToolEntity)
+    suspend fun updateTool(tool: ToolEntity)
 
     @Delete
-    suspend fun delete(tool: ToolEntity)
-
-    @Query("SELECT COUNT(*) FROM tools")
-    fun count(): Flow<Int>
+    suspend fun deleteTool(tool: ToolEntity)
 }

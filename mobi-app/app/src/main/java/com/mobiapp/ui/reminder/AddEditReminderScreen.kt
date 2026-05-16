@@ -1,148 +1,120 @@
 package com.mobiapp.ui.reminder
 
-import android.app.TimePickerDialog
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mobiapp.data.entity.ReminderEntity
-import com.mobiapp.ui.components.*
-import com.mobiapp.ui.process.ChipSelector
-import com.mobiapp.ui.theme.*
-import java.text.SimpleDateFormat
+import com.mobiapp.ui.components.MobiTopBar
+import com.mobiapp.ui.theme.Amber
 import java.util.*
-
-private val CATEGORIES = listOf("General", "Work", "Personal", "Health", "CCTV", "Access Control", "Network")
-private val DAYS = listOf("Mon" to "1", "Tue" to "2", "Wed" to "3", "Thu" to "4", "Fri" to "5", "Sat" to "6", "Sun" to "7")
 
 @Composable
 fun AddEditReminderScreen(
     reminderId: Long?,
     onBack: () -> Unit,
+    onSaved: () -> Unit,
     viewModel: ReminderViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    var message by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(CATEGORIES.first()) }
-    var repeatMode by remember { mutableStateOf("once") }
-    var selectedDays by remember { mutableStateOf(setOf<String>()) }
-    var timeMillis by remember { mutableStateOf(getDefaultTimeMillis()) }
-    var isEdit by remember { mutableStateOf(false) }
+    val existing by viewModel.getReminder(reminderId ?: -1L).collectAsState(initial = null)
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var isRepeating by remember { mutableStateOf(false) }
+    var hour by remember { mutableStateOf(9) }
+    var minute by remember { mutableStateOf(0) }
+    var initialized by remember { mutableStateOf(false) }
 
-    LaunchedEffect(reminderId) {
-        reminderId?.let {
-            val r = viewModel.getById(it) ?: return@let
-            message = r.message; category = r.category; repeatMode = r.repeatMode
-            timeMillis = r.timeMillis; isEdit = true
-            selectedDays = r.weekdays.split(",").filter { d -> d.isNotBlank() }.toSet()
+    LaunchedEffect(existing) {
+        if (!initialized && reminderId != null && existing != null) {
+            title = existing!!.title
+            description = existing!!.description
+            isRepeating = existing!!.isRepeating
+            val cal = Calendar.getInstance().apply { timeInMillis = existing!!.triggerTimeMs }
+            hour = cal.get(Calendar.HOUR_OF_DAY)
+            minute = cal.get(Calendar.MINUTE)
+            initialized = true
         }
     }
 
-    val timeFmt = SimpleDateFormat("HH:mm", Locale.getDefault())
-    val timeDisplay = timeFmt.format(Date(timeMillis))
-
     Scaffold(
-        containerColor = Background,
-        topBar = { MobiTopBar(if (isEdit) "Edit Reminder" else "New Reminder", onBack = onBack) }
+        topBar = { MobiTopBar(if (reminderId == null) "New Reminder" else "Edit Reminder", onBack = onBack) }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding)
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MobiTextField(value = message, onValueChange = { message = it }, label = "Reminder Message", minLines = 2)
+            OutlinedTextField(
+                value = title, onValueChange = { title = it },
+                label = { Text("Title") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
+            OutlinedTextField(
+                value = description, onValueChange = { description = it },
+                label = { Text("Note (optional)") }, modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+            )
 
-            // Time picker
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Time", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                OutlinedButton(
-                    onClick = {
-                        val cal = Calendar.getInstance().apply { timeInMillis = timeMillis }
-                        TimePickerDialog(context, { _, h, m ->
-                            val c = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, m); set(Calendar.SECOND, 0) }
-                            timeMillis = c.timeInMillis % (24 * 60 * 60 * 1000L) + (h * 3600000L + m * 60000L)
-                        }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), true).show()
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Amber),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Outline)
-                ) {
-                    Icon(Icons.Default.Schedule, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(timeDisplay, fontWeight = FontWeight.Bold)
-                }
+            Text("Time", style = MaterialTheme.typography.titleSmall)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = hour.toString().padStart(2, '0'),
+                    onValueChange = { it.toIntOrNull()?.coerceIn(0, 23)?.let { h -> hour = h } },
+                    label = { Text("HH") }, modifier = Modifier.width(80.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+                )
+                Text(":", style = MaterialTheme.typography.headlineMedium)
+                OutlinedTextField(
+                    value = minute.toString().padStart(2, '0'),
+                    onValueChange = { it.toIntOrNull()?.coerceIn(0, 59)?.let { m -> minute = m } },
+                    label = { Text("MM") }, modifier = Modifier.width(80.dp),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Amber)
+                )
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Repeat", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                ChipSelector(listOf("once", "daily", "weekdays"), repeatMode) { repeatMode = it }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("Repeat daily", style = MaterialTheme.typography.bodyLarge)
+                Switch(
+                    checked = isRepeating, onCheckedChange = { isRepeating = it },
+                    colors = SwitchDefaults.colors(checkedThumbColor = Amber, checkedTrackColor = Amber.copy(alpha = 0.4f))
+                )
             }
-
-            if (repeatMode == "weekdays") {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Days", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        DAYS.forEach { (label, value) ->
-                            FilterChip(
-                                selected = value in selectedDays,
-                                onClick = {
-                                    selectedDays = if (value in selectedDays) selectedDays - value else selectedDays + value
-                                },
-                                label = { Text(label) },
-                                modifier = Modifier.weight(1f),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Amber.copy(alpha = 0.2f),
-                                    selectedLabelColor = Amber,
-                                    containerColor = SurfaceVariant,
-                                    labelColor = OnSurfaceVariant
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = Outline, selectedBorderColor = Amber, enabled = true, selected = value in selectedDays
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            Text("Category", color = OnSurfaceVariant, style = MaterialTheme.typography.labelMedium)
-            ChipSelector(CATEGORIES, category) { category = it }
 
             Button(
                 onClick = {
-                    if (message.isBlank()) return@Button
-                    val reminder = ReminderEntity(
-                        id = reminderId ?: 0L,
-                        message = message.trim(),
-                        category = category,
-                        timeMillis = timeMillis,
-                        repeatMode = repeatMode,
-                        weekdays = selectedDays.joinToString(",")
-                    )
-                    viewModel.save(context, reminder)
-                    onBack()
+                    if (title.isNotBlank()) {
+                        val cal = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, hour)
+                            set(Calendar.MINUTE, minute)
+                            set(Calendar.SECOND, 0)
+                            if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
+                        }
+                        val entity = ReminderEntity(
+                            id = reminderId ?: 0L,
+                            title = title.trim(),
+                            description = description.trim(),
+                            triggerTimeMs = cal.timeInMillis,
+                            isRepeating = isRepeating,
+                            repeatIntervalMs = if (isRepeating) 86_400_000L else 0L,
+                            isEnabled = true
+                        )
+                        viewModel.saveReminder(context, entity) { onSaved() }
+                    }
                 },
-                enabled = message.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Amber, contentColor = OnAmber)
-            ) { Text(if (isEdit) "Save Changes" else "Schedule Reminder") }
+                colors = ButtonDefaults.buttonColors(containerColor = Amber)
+            ) {
+                Text("Save", color = MaterialTheme.colorScheme.onPrimary)
+            }
         }
     }
-}
-
-private fun getDefaultTimeMillis(): Long {
-    val cal = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0)
-    }
-    return cal.get(Calendar.HOUR_OF_DAY) * 3600000L + cal.get(Calendar.MINUTE) * 60000L
 }

@@ -15,13 +15,12 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext ctx: Context): AppDatabase =
-        Room.databaseBuilder(ctx, AppDatabase::class.java, AppDatabase.DATABASE_NAME).build()
+    @Provides
+    fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
+        Room.databaseBuilder(context, AppDatabase::class.java, "mobi_app.db").build()
 
     @Provides fun provideProcessDao(db: AppDatabase): ProcessDao = db.processDao()
-    @Provides fun provideProcessStepDao(db: AppDatabase): ProcessStepDao = db.processStepDao()
     @Provides fun provideReminderDao(db: AppDatabase): ReminderDao = db.reminderDao()
     @Provides fun providePromptDao(db: AppDatabase): PromptDao = db.promptDao()
     @Provides fun provideToolDao(db: AppDatabase): ToolDao = db.toolDao()
